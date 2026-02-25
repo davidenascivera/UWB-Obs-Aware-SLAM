@@ -10,11 +10,11 @@ from px4_msgs.msg import SensorCombined
 from px4_msgs.msg import TrajectorySetpoint
 from std_msgs.msg import Float32MultiArray
 
-from ObsAwarePlan.utils import Rbody_to_ENU, is_far_enough
-from ObsAwarePlan.EKF_uwb import EKF_UWB
-from ObsAwarePlan.WLS_Est import WLS_Est
-from ObsAwarePlan.APF_class import APF_Planner
-from ObsAwarePlan.RVIZ_visualizer import RVIZ_Visualizer
+from obs_aware_slam.utils import Rbody_to_ENU, is_far_enough
+from obs_aware_slam.ekf_uwb import EKF_UWB
+from obs_aware_slam.wls_est import WLS_Est
+from obs_aware_slam.apf_class import APF_Planner
+from obs_aware_slam.RVIZ_visualizer import RVIZ_Visualizer
 
 
 class Position_EKF(Node):

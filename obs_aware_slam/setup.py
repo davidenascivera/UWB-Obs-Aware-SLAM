@@ -1,10 +1,10 @@
 from setuptools import find_packages, setup
 
-package_name = 'ObsAwarePlan'
+package_name = 'obs_aware_slam'
 
 setup(
     name=package_name,
-    version='0.1.0',
+    version='0.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -13,15 +13,18 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Davide Nascivera',
-    maintainer_email='davidenascivera@example.com',
-    description='UWB Obstacle-Aware SLAM planner for PX4 drones.',
+    maintainer='dave',
+    maintainer_email='d.nascivera@gmail.com',
+    description='Obstacle-aware UWB SLAM for UAVs using EKF and APF navigation',
     license='MIT',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
-            'position_ekf   = ObsAwarePlan.postion_UWB:main',
-            'slam_planner   = ObsAwarePlan.slam_planner_vel:main',
+            'position_ekf = obs_aware_slam.postion_UWB:main',
         ],
     },
 )

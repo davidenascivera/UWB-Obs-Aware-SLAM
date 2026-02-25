@@ -78,15 +78,7 @@ class ArmAndTakeoff(Node):
             {"y":  7.5670, "x":  1.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
             {"y":  8.0000, "x":  0.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
         ]
-        
-        self.waypoints = [
-            {"x":  0.0,  "y":  0.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},   
-            {"x": -1.0,  "y":  1.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"x":  1.0,  "y":  1.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"x":  1.1,  "y": -1.1,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"x": -1.1,  "y": -1.1,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"x":  0.0,  "y":  0.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
-        ]
+
 
         # Stato interno
         self.current_wp_idx = 0
