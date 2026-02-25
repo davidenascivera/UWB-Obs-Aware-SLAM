@@ -13,7 +13,7 @@ from std_msgs.msg import Float32MultiArray
 from obs_aware_slam.utils import Rbody_to_ENU, is_far_enough
 from obs_aware_slam.ekf_uwb import EKF_UWB
 from obs_aware_slam.wls_est import WLS_Est
-from obs_aware_slam.apf_class import APF_Planner
+from obs_aware_slam.rp_class import RP_Planner
 from obs_aware_slam.RVIZ_visualizer import RVIZ_Visualizer
 
 
@@ -45,7 +45,7 @@ class Position_EKF(Node):
 
         self.uwb_pub = self.create_publisher(Float32MultiArray, '/uwb/ranges', qos_profile=qos_profile)
         self.pos_ekf_pub = self.create_publisher(Odometry, '/uwb_ekf/odometry', qos_profile=qos_profile)
-        self.apf_waypoint_pub = self.create_publisher(TrajectorySetpoint, '/apf/waypoint', qos_profile=qos_setpoint)
+        self.rp_waypoint_pub = self.create_publisher(TrajectorySetpoint, '/rp/waypoint', qos_profile=qos_setpoint)
         self.uwb_noise_std = 0.15  # Standard deviation of UWB measurement noise
         
         # TODO Le ancore nella quarta colonna hanno il loro ID. Successivamente verrà automatizzato, ma per visualizzarlo meglio così
@@ -169,7 +169,7 @@ class Position_EKF(Node):
         self.n_anc_fix_seen = 0 #TODO can be deleted
         self.update_filters_counter = 0  # Counter for periodic reordering
 
-        self.ApfNav = APF_Planner(smooth=0.5, max_turn_deg=45, Jratio_th=1.0) #smooth basso = più smooth
+        self.RpNav = RP_Planner(smooth=0.5, max_turn_deg=45, Jratio_th=1.0) #smooth basso = più smooth
         self.x_goal_list = [np.array([0.0, 7.0]),
                             np.array([2.0, 9.0]),
                             np.array([7.0, 9.0]),
@@ -179,7 +179,7 @@ class Position_EKF(Node):
         self.goal_threshold = 1.0  # Distanza per considerare goal raggiunto
         self.current_goal_idx = 0  
         
-        self.displacement_apf = 0.6
+        self.displacement_rp = 0.6
         self.last_dir = np.array([0.0, 0.0])
         self.timer_planner = self.create_timer(0.6, self.publish_planner_setpoint)
         self.timer_mission = self.create_timer(0.2, self.check_finished_mission)
@@ -252,7 +252,7 @@ class Position_EKF(Node):
         
         current_goal = self.x_goal_list[self.current_goal_idx]
         
-        self.last_dir = self.ApfNav.update_direction(self.Est_dict, goal_pos=current_goal, x_robot=pos_robot)
+        self.last_dir = self.RpNav.update_direction(self.Est_dict, goal_pos=current_goal, x_robot=pos_robot)
         if np.linalg.norm(self.last_dir) < 1e-3:
             return
 
@@ -267,8 +267,8 @@ class Position_EKF(Node):
         z_enu = self.last_est_pos[2]
 
         dir_xy = self.last_dir / np.linalg.norm(self.last_dir)
-        wp_x_enu = x_enu + self.displacement_apf * dir_xy[0]
-        wp_y_enu = y_enu + self.displacement_apf * dir_xy[1]
+        wp_x_enu = x_enu + self.displacement_rp * dir_xy[0]
+        wp_y_enu = y_enu + self.displacement_rp * dir_xy[1]
 
         # ENU -> NED
         x_ned = wp_y_enu
@@ -284,9 +284,9 @@ class Position_EKF(Node):
         dy_ned = dir_xy[0]
         # sp.yaw = float(np.arctan2(dy_ned, dx_ned))
         sp.yaw = 0.0
-        # print(f"Publishing APF waypoint at NED ({sp.position[0]:.2f}, {sp.position[1]:.2f}, {sp.position[2]:.2f}) with yaw {sp.yaw:.2f} rad")
+        # print(f"Publishing RP waypoint at NED ({sp.position[0]:.2f}, {sp.position[1]:.2f}, {sp.position[2]:.2f}) with yaw {sp.yaw:.2f} rad")
     
-        self.apf_waypoint_pub.publish(sp)
+        self.rp_waypoint_pub.publish(sp)
 
         
     def update_drones_rviz(self):
@@ -299,8 +299,8 @@ class Position_EKF(Node):
         # # # 2. Updating the arrow for direction
         # pos_robot = self.EKF_uwb.x[:3, :].flatten()
         # pos_xy = pos_robot[:2]
-        # direzione = self.ApfNav.update_direction(self.Est_dict, goal_pos=self.x_goal, x_robot=pos_xy)
-        # # self.get_logger().info(f" APF direction (non-smooth): {direzione}")
+        # direzione = self.RpNav.update_direction(self.Est_dict, goal_pos=self.x_goal, x_robot=pos_xy)
+        # # self.get_logger().info(f" RP direction (non-smooth): {direzione}")
         # self.Rviz_viz.publish_direction_arrow(pos_xyz=pos_robot, dir_xy=direzione, length=2.0)
         
         # 3. Updating estimated anchor positions

@@ -187,13 +187,13 @@ class RVIZ_Visualizer:
         pos_xyz,
         dir_xy,
         length: float = 1.0,
-        ns: str = "apf_dir",
+        ns: str = "rp_dir",
         marker_id: int = 0,
     ):
         """
         Disegna una freccia in 2D usando:
           pos_xyz = (x, y, z) posizione attuale del robot
-          dir_xy  = (dx, dy) direzione APF in 2D
+          dir_xy  = (dx, dy) direzione RP in 2D
           length  = lunghezza visuale della freccia
         La quota z viene presa da pos_xyz.
         """

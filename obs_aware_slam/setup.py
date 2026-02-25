@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='dave',
     maintainer_email='d.nascivera@gmail.com',
-    description='Obstacle-aware UWB SLAM for UAVs using EKF and APF navigation',
+    description='Obstacle-aware UWB SLAM for UAVs using EKF and Reactive Planner navigation',
     license='MIT',
     extras_require={
         'test': [

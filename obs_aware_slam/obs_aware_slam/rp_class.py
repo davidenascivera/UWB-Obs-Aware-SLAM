@@ -3,7 +3,7 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-class APF_Planner:
+class RP_Planner:
     
     def __init__(self, smooth = 0.3, max_turn_deg = 30.0, Jratio_th = 1.0):
         self.smooth = smooth

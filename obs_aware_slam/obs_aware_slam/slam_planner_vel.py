@@ -40,11 +40,11 @@ class ArmAndTakeoff(Node):
         )
 
 
-        # Subscriber APF (Exploration)
-        self.apf_waypoint_sub = self.create_subscription(
+        # Subscriber RP (Exploration)
+        self.rp_waypoint_sub = self.create_subscription(
             TrajectorySetpoint,
-            '/apf/waypoint',
-            self.apf_waypoint_callback,
+            '/rp/waypoint',
+            self.rp_waypoint_callback,
             qos_profile
         )
 
@@ -118,8 +118,8 @@ class ArmAndTakeoff(Node):
         
         self.have_estimate = True
 
-    # --- CALLBACK APF (EXPLORATION) ---
-    def apf_waypoint_callback(self, msg: TrajectorySetpoint):
+    # --- CALLBACK RP (EXPLORATION) ---
+    def rp_waypoint_callback(self, msg: TrajectorySetpoint):
         if self.controller_mode == 'Exploration':
             # Aggiorniamo il target. Il control_loop si occuperà di inseguirlo.
             self.exploration_target = {
@@ -127,10 +127,10 @@ class ArmAndTakeoff(Node):
                 "y": msg.position[1],
                 "z": msg.position[2],
                 "yaw": msg.yaw,
-                "useDegrees": False # APF invia verosimilmente in radianti
+                "useDegrees": False # RP invia verosimilmente in radianti
             }
             # Logging ridotto per non intasare la console
-            # self.get_logger().info(f"APF Update: {self.exploration_target['x']:.2f}, {self.exploration_target['y']:.2f}")
+            # self.get_logger().info(f"RP Update: {self.exploration_target['x']:.2f}, {self.exploration_target['y']:.2f}")
 
     # --- CICLO DI CONTROLLO PRINCIPALE ---
     def control_loop(self):
