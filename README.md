@@ -10,7 +10,15 @@ The paper is available [here](docs/paper/I2MTC26___UWB_EKF_SLAM___Nascivera.pdf)
 
 *Active SLAM planner in action: the drone navigates while mapping UWB anchors online.*
 
+## System Architecture
 
+![System Architecture](docs/images/schema.png)
+
+## Results
+
+![Trajectory and Map](docs/images/maps_and_traj.png)
+
+*Left: scenario setup with fixed anchors (red squares) and SLAM anchors (green circles). Right: ground truth vs EKF estimate trajectory.*
 ---
 
 ## Overview
