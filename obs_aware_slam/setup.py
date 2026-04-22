@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'position_ekf = obs_aware_slam.postion_UWB:main',
+            'slam_planner_vel = obs_aware_slam.slam_planner_vel:main'
         ],
     },
 )

@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from nav_msgs.msg import Odometry  # Necessario per leggere Gazebo
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand # type: ignore
 
 import math 
 import time
@@ -50,35 +50,13 @@ class ArmAndTakeoff(Node):
 
         # Waypoints missione (Calibration) - Frame NED
         self.waypoints = [
-            {"y":  0.0000, "x":  0.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y": -0.4330, "x":  1.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.4330, "x":  2.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.0000, "x":  3.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y": -0.4330, "x":  4.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.4330, "x":  5.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.0000, "x":  6.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y": -0.4330, "x":  7.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.4330, "x":  8.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  0.0000, "x":  9.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  1.0000, "x":  9.5000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  2.0000, "x":  9.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  3.0000, "x":  8.5000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  4.0000, "x":  9.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  5.0000, "x":  9.5000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  6.0000, "x":  9.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  7.0000, "x":  8.5000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.0000, "x":  9.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.4330, "x":  8.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  7.5670, "x":  7.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.0000, "x":  6.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.4330, "x":  5.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  7.5670, "x":  4.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.0000, "x":  3.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.4330, "x":  2.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  7.5670, "x":  1.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
-            {"y":  8.0000, "x":  0.0000, "z": -3.0, "yaw": 0.0, "useDegrees": True},
+            {"x":  0.0,  "y":  0.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},   
+            {"x": -1.0,  "y":  1.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
+            {"x":  1.0,  "y":  1.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
+            {"x":  1.1,  "y": -1.1,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
+            {"x": -1.1,  "y": -1.1,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
+            {"x":  0.0,  "y":  0.0,  "z": -3.0, "yaw": 0.0, "useDegrees": True},
         ]
-
 
         # Stato interno
         self.current_wp_idx = 0

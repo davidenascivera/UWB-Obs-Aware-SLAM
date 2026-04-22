@@ -6,11 +6,11 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 from nav_msgs.msg import Odometry
-from px4_msgs.msg import SensorCombined
-from px4_msgs.msg import TrajectorySetpoint
+from px4_msgs.msg import SensorCombined # type: ignore
+from px4_msgs.msg import TrajectorySetpoint # type: ignore
 from std_msgs.msg import Float32MultiArray
 
-from obs_aware_slam.utils import Rbody_to_ENU, is_far_enough
+from obs_aware_slam.utils import Rbody_to_ENU, is_far_enough, get_meas_seen
 from obs_aware_slam.ekf_uwb import EKF_UWB
 from obs_aware_slam.wls_est import WLS_Est
 from obs_aware_slam.rp_class import RP_Planner
@@ -48,7 +48,7 @@ class Position_EKF(Node):
         self.rp_waypoint_pub = self.create_publisher(TrajectorySetpoint, '/rp/waypoint', qos_profile=qos_setpoint)
         self.uwb_noise_std = 0.15  # Standard deviation of UWB measurement noise
         
-        # TODO Le ancore nella quarta colonna hanno il loro ID. Successivamente verrà automatizzato, ma per visualizzarlo meglio così
+        #
         self.Anchors_fix = np.array([
             [-1.0, -1.0, 1.0, 100],
             [-1.0,  1.0, 3.0, 101],
@@ -58,148 +58,36 @@ class Position_EKF(Node):
         ])
         
         # Get Monte Carlo seed parameter
-        self.declare_parameter('mc_seed', 0)
-        self.declare_parameter('x0', 0.0)
-        self.declare_parameter('y0', 0.0)
-
-        seed = self.get_parameter('mc_seed').value
-        self.x0 = self.get_parameter('x0').value
-        self.y0 = self.get_parameter('y0').value
+        self._init_mc_params()
+        
         self.mission_completed = False
         self.start_time = self.get_clock().now()
 
-        np.random.seed(seed)
+        np.random.seed(self.seed)
 
-        self.get_logger().info(
-            f"MC seed={seed}, x0={self.x0:.2f}, y0={self.y0:.2f}"
-        )
-        
-        
-        # Create directory for Monte Carlo run (use absolute path)
-        base_dir = os.path.join(os.path.expanduser("~"), "UV_proj", "mc_results")
-        os.makedirs(base_dir, exist_ok=True)
-        self.csv_path = os.path.join(base_dir, f"data_run_{seed:03d}.csv")
-        self.get_logger().info(f"Saving results to: {base_dir}")
+        # Create the anchors in random position
+        self._init_anchors_slam()
 
+        # Save the position of the anchors for data analysis
+        self._save_config()
         
-
+        # Initialize the EKF
+        self._init_ekf()
         
-        self.sensor_z_height_m = 1.0  # Altezza del sensore UWB dal suolo 
-        n_anchors = 11
-        x_min, x_max = -2.0, 9.0
-        y_min, y_max = -2.0, 11.0 
-        min_dist = 2.0
-        anchors = []
-        
-        while len(anchors) < n_anchors:
-            x = np.random.uniform(x_min, x_max)
-            y = np.random.uniform(y_min, y_max)
-            candidate = np.array([x, y])
-            if is_far_enough(candidate, anchors, min_dist):
-                anchors.append(candidate)
-
-        anchors = np.array(anchors)
-        ids = np.arange(n_anchors)
-
-        self.Anchors_slam = np.column_stack([
-            anchors[:, 0],
-            anchors[:, 1],
-            np.ones(n_anchors) * self.sensor_z_height_m,
-            ids
-        ])
-        
-        # self.Anchors_slam = np.array([
-        #     [ 2.0, 11.0, self.sensor_z_height_m, 0],
-        #     [ 8.0, 11.0, self.sensor_z_height_m, 1],
-        #     [ 8.0,  4.0, self.sensor_z_height_m, 2],
-        #     [ 1.0,  4.0, self.sensor_z_height_m, 3],
-        #     [-1.0,  7.0, self.sensor_z_height_m, 4],
-        #     [-2.0,  2.0, self.sensor_z_height_m, 5],
-        #     [-4.0,  6.0, self.sensor_z_height_m, 6],
-        #     [ 6.0,  8.0, self.sensor_z_height_m, 7],
-        #     [ -2.0,  10.0, self.sensor_z_height_m, 8]
-        # ])
-        
-        #----------------------------------------------------
-        # 1. Prepariamo i metadati (seed, x0, y0)
-        metadata = [seed, self.x0, self.y0]
-
-        # 2. Estraiamo le coordinate x, y delle ancore e le "appiattiamo" (flatten)
-        # self.Anchors_slam ha colonne: [x, y, z, id]
-        # Prendiamo solo le prime due colonne e le trasformiamo in una lista singola
-        anchor_coords = self.Anchors_slam[:, :2].flatten().tolist()
-
-        # 3. Uniamo tutto in un'unica riga
-        config_row = metadata + anchor_coords
-
-        # 4. Creiamo un header dinamico per chiarezza (es. seed, x0, y0, ancx0, ancy0, ...)
-        n_anchors = self.Anchors_slam.shape[0]
-        header_parts = ["seed", "posx", "posy"]
-        for i in range(n_anchors):
-            header_parts.append(f"ancx{i+1}")
-            header_parts.append(f"ancy{i+1}")
-        header_string = ",".join(header_parts)
-
-        # 5. Salvataggio su file
-        config_path = os.path.join(base_dir, f"conf_{seed:03d}.csv")
-        np.savetxt(config_path, [config_row], delimiter=",", header=header_string, comments='')
-
-        self.get_logger().info(f"Configurazione scenario salvata in: {config_path}")
-        # ----------------------------------------------------
-        
-        
-        x0 = np.zeros((6, 1))  # Initial state [x, y, z, vx, vy, vz]
-        P0 = np.eye(6) * 10.0
-        sig_a_proc = 0.2  # Process noise standard deviation for acceleration
-        sig_a_meas = 0.2  # Measurement noise standard deviation for acceleration
-        self.EKF_uwb = EKF_UWB(x0 = x0, P= P0,  
-                               sig_a_proc=sig_a_proc, sig_a_meas=sig_a_meas,
-                               CA_dynamic=True,
-                               use_acc_pseudomeas=True,
-                               Anchors_fix=self.Anchors_fix,
-                               uwb_noise_std = self.uwb_noise_std,
-                               z_anc=self.sensor_z_height_m)  
-        
-        self.a_body = None
-        self.a_stamp_us = None
-        
-        
-        self.Est_dict = {}
-        self.initialized_anc = set()
-        self.n_anc_fix_seen = 0 #TODO can be deleted
-        self.update_filters_counter = 0  # Counter for periodic reordering
-
-        self.RpNav = RP_Planner(smooth=0.5, max_turn_deg=45, Jratio_th=1.0) #smooth basso = più smooth
-        self.x_goal_list = [np.array([0.0, 7.0]),
-                            np.array([2.0, 9.0]),
-                            np.array([7.0, 9.0]),
-                            np.array([8.0, 7.0]),
-                            np.array([8.0, 0.0])]
-        
-        self.goal_threshold = 1.0  # Distanza per considerare goal raggiunto
-        self.current_goal_idx = 0  
-        
-        self.displacement_rp = 0.6
-        self.last_dir = np.array([0.0, 0.0])
+        # Initialize the Planner
+        self._init_planner()
         self.timer_planner = self.create_timer(0.6, self.publish_planner_setpoint)
         self.timer_mission = self.create_timer(0.2, self.check_finished_mission)
-        
-        self.get_logger().info(f"est EKF CA_dyn = {self.EKF_uwb.use_CA}, acc_pseudomeas = {self.EKF_uwb.use_acc_pseudomeas} initialized.")
+
         
         # Enable/disable for publishing
-        self.Rviz_viz = RVIZ_Visualizer(self, frame_id="map", traj_max_len=1000)
-        self.last_est_pos = np.zeros(3) # è un (3,)
-        self.last_gt_pos = np.zeros(3)
-        self.estimated_anc_positions = []
-        self.Rviz_viz.clear_markers()
-        self.Rviz_viz.publish_anchors(self.Anchors_fix, kind="fix") 
-        self.Rviz_viz.publish_anchors(self.Anchors_slam, kind="slam")
-        self.get_logger().info("Nodes fixed published to RViz.")
+        self._init_rviz2()
         
         self.timer_rviz = self.create_timer(0.1, self.update_drones_rviz)   # 10 Hz
         
-        self.DATA = []
+        
         self._shutdown_requested = False
+        self.DATA = []
         
 
     def check_finished_mission(self):
@@ -314,6 +202,7 @@ class Position_EKF(Node):
             data_row[inizio_stampa : inizio_stampa +2] = pos_est.flatten()
 
         self.DATA.append(data_row)
+        
         # Save every 10 entries
         # Salvataggio incrementale ogni 10 campioni
         if len(self.DATA) % 10 == 0:
@@ -349,7 +238,6 @@ class Position_EKF(Node):
         msg_uwb = Float32MultiArray()
         msg_uwb.data = []
         
-        # Use odometry timestamp instead of IMU to avoid race conditions
         # Convert ROS2 timestamp to microseconds
         current_time_us = int(msg.header.stamp.sec * 1e6 + msg.header.stamp.nanosec / 1e3)
         
@@ -381,7 +269,6 @@ class Position_EKF(Node):
         _, id_dist_slam = get_meas_seen(self.Anchors_slam, p_robot, 
                                          distance_th=8, noise_uwb=self.uwb_noise_std)
         id_dist_meas = np.vstack([id_dist_fix, id_dist_slam])
-        self.n_anc_fix_seen = id_dist_fix.shape[0]  #TODO can be deleted
         
         # Creiamo dei filtri WLS per ogni misura SLAM vista
         for id_slam in id_dist_slam:
@@ -390,23 +277,10 @@ class Position_EKF(Node):
             if id_anc not in self.Est_dict and id_anc not in self.initialized_anc:
                 self.Est_dict[id_anc] = WLS_Est(th_move_delta=0.05, counter_still_th= 7,
                                                     a_z_given=self.sensor_z_height_m, min_distance_meas=0.2)
-                
-        # print(f"The id being tracked are: {list(self.Est_dict.keys())}")
-        # print(f"Meas slam: \n {meas_id_slam}")
+            
         
-        q = np.zeros((4, 1))
-        q[0] = msg.pose.pose.orientation.w
-        q[1] = msg.pose.pose.orientation.x
-        q[2] = msg.pose.pose.orientation.y
-        q[3] = msg.pose.pose.orientation.z
-        # a_enu = Rbody_to_ENU(q) @ self.a_body
-        a_body_flu = np.vstack([ self.a_body[0:1],
-                                -self.a_body[1:2],
-                                -self.a_body[2:3] ])
-        a_enu = Rbody_to_ENU(q) @ a_body_flu       # rotate specific force
-        a_enu += np.array([[0.0],[0.0],[-9.81]])  # add gravity in ENU
         # print(f"Acceleration in ENU frame:\n{a_enu.flatten()}")
-        
+        a_enu = self._compute_acceleration_enu(msg)
         self.update_filters(dt_sec = elapsed_time / 1e6,
                             a_enu = a_enu,
                             id_dist_meas=id_dist_meas,
@@ -486,34 +360,142 @@ class Position_EKF(Node):
                                 msg.accelerometer_m_s2[1],
                                 msg.accelerometer_m_s2[2]]).reshape(-1,1)
         self.a_stamp_us = msg.timestamp
-
-def get_meas_seen(Anchors, pos_robot, distance_th=15, noise_uwb = 0.15):
-    '''
-    Given the robot position, return the anchors seen within distance_th
-    Returns: positions (Nx3), [id, distance_noisy] (Nx2)
-    '''
-    Anc_seen = []
-    for row in Anchors:
-        ancx, ancy, ancz, id = row[0], row[1], row[2], row[3]
-        px, py, pz = pos_robot[0], pos_robot[1], pos_robot[2]
-        # Compute distance
-        distance = np.sqrt( (px - ancx)**2 + (py - ancy)**2 + (pz - ancz)**2 )
-        if distance <= distance_th:
-            distance_noisy = distance + np.random.normal(0, noise_uwb)
-            new_row = [ancx, ancy, ancz, id, distance_noisy]
-            Anc_seen.append(new_row)
-            
-    Anc_seen_vec = np.array(Anc_seen)
-    
-    if not Anc_seen:
-        return np.empty((0, 3)), np.empty((0, 2))
-    
-    if Anc_seen_vec.ndim == 1:
-        Anc_seen_vec = Anc_seen_vec.reshape(1, -1)
         
-    id_dist = Anc_seen_vec[:, 3:]
-    positions = Anc_seen_vec[:, :3]
-    return positions, id_dist
+    def _init_anchors_slam(self):
+        self.sensor_z_height_m = 1.0  # Altezza del sensore UWB dal suolo 
+        n_anchors = 11
+        x_min, x_max = -2.0, 9.0
+        y_min, y_max = -2.0, 11.0 
+        min_dist = 2.0
+        anchors = []
+        
+        while len(anchors) < n_anchors:
+            x = np.random.uniform(x_min, x_max)
+            y = np.random.uniform(y_min, y_max)
+            candidate = np.array([x, y])
+            if is_far_enough(candidate, anchors, min_dist):
+                anchors.append(candidate)
+
+        anchors = np.array(anchors)
+        ids = np.arange(n_anchors)
+
+        self.Anchors_slam = np.column_stack([
+            anchors[:, 0],
+            anchors[:, 1],
+            np.ones(n_anchors) * self.sensor_z_height_m,
+            ids
+        ])
+
+    def _init_ekf(self):
+        x0 = np.zeros((6, 1))  # Initial state [x, y, z, vx, vy, vz]
+        P0 = np.eye(6) * 10.0
+        sig_a_proc = 0.2  # Process noise standard deviation for acceleration
+        sig_a_meas = 0.2  # Measurement noise standard deviation for acceleration
+        self.EKF_uwb = EKF_UWB(x0 = x0, P= P0,  
+                               sig_a_proc=sig_a_proc, sig_a_meas=sig_a_meas,
+                               CA_dynamic=True,
+                               use_acc_pseudomeas=True,
+                               Anchors_fix=self.Anchors_fix,
+                               uwb_noise_std = self.uwb_noise_std,
+                               z_anc=self.sensor_z_height_m)  
+        
+        self.a_body = None
+        self.a_stamp_us = None
+        
+        
+        self.Est_dict = {}
+        self.initialized_anc = set()
+        self.update_filters_counter = 0  # Counter for periodic reordering
+        
+        self.get_logger().info(f"est EKF CA_dyn = {self.EKF_uwb.use_CA}, acc_pseudomeas = {self.EKF_uwb.use_acc_pseudomeas} initialized.")
+
+
+    def _init_rviz2(self):
+        self.Rviz_viz = RVIZ_Visualizer(self, frame_id="map", traj_max_len=1000)
+        self.last_est_pos = np.zeros(3) # è un (3,)
+        self.last_gt_pos = np.zeros(3)
+        self.estimated_anc_positions = []
+        self.Rviz_viz.clear_markers()
+        self.Rviz_viz.publish_anchors(self.Anchors_fix, kind="fix") 
+        self.Rviz_viz.publish_anchors(self.Anchors_slam, kind="slam")
+        self.get_logger().info("Nodes fixed published to RViz.")
+
+    def _save_config(self):
+        '''
+        Function used for the montecarlo logging. It allow us to save initial position of the anchors, initial position
+        of the UAV etc.
+        '''
+        # Create directory for Monte Carlo run (use absolute path)
+        base_dir = os.path.join(os.path.expanduser("~"), "UV_proj", "mc_results")
+        os.makedirs(base_dir, exist_ok=True)
+        self.csv_path = os.path.join(base_dir, f"data_run_{self.seed:03d}.csv")
+        self.get_logger().info(f"Saving results to: {base_dir}")
+        
+        # Prepare the metadata as [seeed, (intial x,y)]
+        metadata = [self.seed, self.x0, self.y0]
+
+        # Now we want to log also the x,y coordinates
+        # self.Anchors_slam is: [x, y, z, id]
+        anchor_coords = self.Anchors_slam[:, :2].flatten().tolist()
+
+        config_row = metadata + anchor_coords
+
+        # Create the header for simplicity in post processing
+        n_anchors = self.Anchors_slam.shape[0]
+        header_parts = ["seed", "posx", "posy"]
+        for i in range(n_anchors):
+            header_parts.append(f"ancx{i+1}")
+            header_parts.append(f"ancy{i+1}")
+        header_string = ",".join(header_parts)
+
+        # 5. Save to File
+        config_path = os.path.join(base_dir, f"conf_{self.seed:03d}.csv")
+        np.savetxt(config_path, [config_row], delimiter=",", header=header_string, comments='')
+
+        self.get_logger().info(f"Configurazione scenario salvata in: {config_path}")
+        
+        
+    def _init_mc_params(self):
+        self.declare_parameter('mc_seed', 0)
+        self.declare_parameter('x0', 0.0)
+        self.declare_parameter('y0', 0.0)
+        self.seed = self.get_parameter('mc_seed').value
+        self.x0 = self.get_parameter('x0').value
+        self.y0 = self.get_parameter('y0').value
+        
+        self.get_logger().info(
+            f"MC seed={self.seed}, x0={self.x0:.2f}, y0={self.y0:.2f}"
+        )
+        
+    def _init_planner(self):
+        # Initialize the RP module
+        self.RpNav = RP_Planner(smooth=0.5, max_turn_deg=45, Jratio_th=1.0) #smooth basso = più smooth
+        self.x_goal_list = [np.array([0.0, 7.0]),
+                            np.array([2.0, 9.0]),
+                            np.array([7.0, 9.0]),
+                            np.array([8.0, 7.0]),
+                            np.array([8.0, 0.0])]
+        
+        self.goal_threshold = 1.0  # Distanza per considerare goal raggiunto
+        self.current_goal_idx = 0  
+        self.displacement_rp = 0.6
+        self.last_dir = np.array([0.0, 0.0])
+        
+    def _compute_acceleration_enu(self, msg):
+        q = np.zeros((4, 1))
+        q[0] = msg.pose.pose.orientation.w
+        q[1] = msg.pose.pose.orientation.x
+        q[2] = msg.pose.pose.orientation.y
+        q[3] = msg.pose.pose.orientation.z
+        # a_enu = Rbody_to_ENU(q) @ self.a_body
+        if self.a_body is None:
+            raise ValueError("Error, acceleration invalid") 
+        a_body_flu = np.vstack([ self.a_body[0:1],
+                                -self.a_body[1:2],
+                                -self.a_body[2:3] ])
+        a_enu = Rbody_to_ENU(q) @ a_body_flu       # rotate specific force
+        a_enu += np.array([[0.0],[0.0],[-9.81]])  # add gravity in ENU
+        return a_enu
             
     
 def main(args=None):

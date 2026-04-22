@@ -275,3 +275,31 @@ def Rbody_to_ENU(q):
         [2*(x*z - w*y),       2*(y*z + w*x),       1 - 2*(x*x + y*y)]
     ])
     return R
+
+def get_meas_seen(Anchors, pos_robot, distance_th=15, noise_uwb = 0.15):
+    '''
+    Given the robot position, return the anchors seen within distance_th
+    Returns: positions (Nx3), [id, distance_noisy] (Nx2)
+    '''
+    Anc_seen = []
+    for row in Anchors:
+        ancx, ancy, ancz, id = row[0], row[1], row[2], row[3]
+        px, py, pz = pos_robot[0], pos_robot[1], pos_robot[2]
+        # Compute distance
+        distance = np.sqrt( (px - ancx)**2 + (py - ancy)**2 + (pz - ancz)**2 )
+        if distance <= distance_th:
+            distance_noisy = distance + np.random.normal(0, noise_uwb)
+            new_row = [ancx, ancy, ancz, id, distance_noisy]
+            Anc_seen.append(new_row)
+            
+    Anc_seen_vec = np.array(Anc_seen)
+    
+    if not Anc_seen:
+        return np.empty((0, 3)), np.empty((0, 2))
+    
+    if Anc_seen_vec.ndim == 1:
+        Anc_seen_vec = Anc_seen_vec.reshape(1, -1)
+        
+    id_dist = Anc_seen_vec[:, 3:]
+    positions = Anc_seen_vec[:, :3]
+    return positions, id_dist
