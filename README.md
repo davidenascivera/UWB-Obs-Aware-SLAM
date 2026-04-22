@@ -1,13 +1,13 @@
 # UWB Obstacle-Aware Active SLAM 
 
 
-This is the repo of the paper "UWB-based Active SLAM for UAVs in GNSS-Denied Environments" that has been accepted for IEEE I2MTC 2026 Nancy. In this repo it's possible to find the code behind and the paper in [document]
+This is the repo of the paper "UWB-based Active SLAM for UAVs in GNSS-Denied Environments" that has been accepted for IEEE I2MTC 2026 Nancy. In this repo it's possible to find the code behind and the paper in [document](obs_aware_slam/docs/paper/I2MTC26___UWB_EKF_SLAM___Nascivera.pdf)
 
 ## Demo
 
 [screencast animation]
 
-![UWB SLAM Screencast](docs/images/screencast_trimmed.gif)
+![UWB SLAM Screencast](obs_aware_slam/docs/images/screencast_trimmed.gif)
 
 *Screencast showing the active SLAM planner in action*
 
