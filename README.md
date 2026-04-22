@@ -14,30 +14,17 @@ The paper is available [here](docs/paper/I2MTC26___UWB_EKF_SLAM___Nascivera.pdf)
 
 ![System Architecture](docs/images/schema.png)
 
+The framework takes UWB range measurements and IMU data as input. The core component is the EKF-SLAM, which jointly estimates the robot position and the anchor positions online. Due to the nonlinearity of the measurement model, each new anchor must be initialized close to its true position before being added to the EKF state.
+
+The reactive planner computes the UAV trajectory that resolves flip ambiguities and maximizes estimation quality using the D-optimality criterion.
+
+
 ## Results
 
 ![Trajectory and Map](docs/images/maps_and_traj.png)
 
 *Left: scenario setup with fixed anchors (red squares) and SLAM anchors (green circles). Right: ground truth vs EKF estimate trajectory.*
----
 
-## Overview
-
-The framework integrates:
-
-- EKF-based range-only SLAM  
-- IMU acceleration fusion  
-- Bank of Weighted Least Squares (WLS) estimators for robust anchor initialization  
-- Flip-ambiguity detection and rejection  
-- Observability-aware reactive planning  
-- RViz visualization support  
-- Monte Carlo simulation capability  
-
-The planner actively modifies the trajectory to:
-
-- Resolve geometric symmetries  
-- Improve Fisher Information conditioning  
-- Reduce landmark initialization failures  
 
 ---
 
@@ -108,16 +95,3 @@ To visualize in RViz2:
 ```bash
 rviz2
 ```
----
-
-## Notes
-
-- Anchors with known positions are used for initial localization.  
-- Unknown anchors are initialized via WLS before being added to the EKF state.  
-- The reactive planner prevents flip ambiguity during range-only SLAM.  
-
----
-
-## License
-
-MIT
