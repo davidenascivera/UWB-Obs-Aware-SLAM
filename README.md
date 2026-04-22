@@ -1,21 +1,15 @@
 # UWB Obstacle-Aware Active SLAM 
 
+This is the repo of the paper "UWB-based Active SLAM for UAVs in GNSS-Denied Environments" accepted at IEEE I2MTC 2026, Nancy. The code implements a UWB SLAM system that enables autonomous UAV navigation with no prior knowledge of the environment. Given a goal position, the drone moves while maximizing its localization observability.
 
-This is the repo of the paper "UWB-based Active SLAM for UAVs in GNSS-Denied Environments" that has been accepted for IEEE I2MTC 2026 Nancy. In this repo it's possible to find the code behind and the paper in [document](obs_aware_slam/docs/paper/I2MTC26___UWB_EKF_SLAM___Nascivera.pdf)
+The paper is available [here](docs/paper/I2MTC26___UWB_EKF_SLAM___Nascivera.pdf).
 
 ## Demo
 
-[screencast animation]
+![UWB SLAM Screencast](docs/images/screencast_trimmed.gif)
 
-![UWB SLAM Screencast](obs_aware_slam/docs/images/screencast_trimmed.gif)
+*Active SLAM planner in action: the drone navigates while mapping UWB anchors online.*
 
-*Screencast showing the active SLAM planner in action*
-
-
-
-ROS2 implementation of an Active SLAM framework for UAV localization in GNSS-denied environments using **range-only UWB measurements** and **IMU integration**.
-
-The system performs joint UAV state estimation and online anchor mapping through an Extended Kalman Filter (EKF), combined with a delayed landmark initialization strategy and an uncertainty-aware reactive planner.
 
 ---
 
